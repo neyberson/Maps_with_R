@@ -45,7 +45,7 @@ raster_files <-list.files(
     full.names = T
 )
 
-crs <- "EPSG:9377"
+crs <- "EPSG:4326"
 for(raster in raster_files){
     rasters <- terra::rast(raster)
     
@@ -141,10 +141,10 @@ elev <- elevatr::get_elev_raster(
 
 
 crs_bogota <-
-  "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +datum=WGS84 +units=m +no_frfs"
+  "+proj=tcea +lon_0=-72.9052734 +datum=WGS84 +units=m +no_defs"
 
 land_cover_colombia_resampled <- terra::resample(
-  x = land_cover_bosnia,
+  x = land_cover_colombia,
   y = terra::rast(elev),
   method = "near"
 ) |>
@@ -152,3 +152,66 @@ land_cover_colombia_resampled <- terra::resample(
 
 terra::plotRGB(land_cover_colombia_resampled)
 
+img_file <- "land_cover_colombia.png"
+
+terra::writeRaster(
+  land_cover_colombia_resampled,
+  img_file,
+  overwrite = T,
+  NAflag = 255
+)
+
+img <- png::readPNG(img_file)
+
+# RENDER SCENE
+
+elev_bogota <- elev |>
+  terra::rast() |>
+  terra::project(crs_bogota)
+
+elmat <- rayshader::raster_to_matrix(
+  elev_bogota
+)
+
+h <- nrow(elev_bogota)
+w <- ncol(elev_bogota)
+
+elmat |>
+  rayshader::height_shade(
+    texture = colorRampPalette(
+      cols[9]
+    )(256)
+  ) |>
+  rayshader::add_overlay(
+    img,
+    alphalayer = 1
+  ) |>
+  rayshader::plot_3d(
+    elmat,
+    zscale = 20,
+    solid = F,
+    shadow = T,
+    shadow_darkness = 1,
+    background = "white",
+    windowsize = c(
+      w / 5, h / 5
+    ),
+    zoom = .5,
+    phi = 60,
+    theta = 0
+  )
+
+rayshader::render_camera(
+  zoom = .58
+)
+
+#RENDER OBJECT
+
+filename <- "3d_land_cover_colombia.png"
+
+rayshader::render_highquality(
+  filename = filename,
+  preview = T,
+  ligth = F,
+  envioronment_ligth = "air_museum_playground_4k.hdr"
+)
